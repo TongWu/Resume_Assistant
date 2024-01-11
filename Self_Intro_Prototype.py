@@ -89,7 +89,7 @@ def main():
     thread = client.beta.threads.create()
 
     # When user upload a resume, generate a brief introduction of this resume
-    ask(thread, "Give a brief summary of this resume, word limit 50 words.")
+    ask(thread, "Give a brief bullet-point of candidate's name, education experience, and skills.")
     print(f'BRIEF SUMMARY: {run_gpt(assistant, thread).data[0].content[0].text.value}')
 
     while True:
