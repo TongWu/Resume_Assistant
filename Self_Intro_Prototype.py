@@ -6,6 +6,7 @@ from tkinter import filedialog
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import sys
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
@@ -35,11 +36,13 @@ def get_model_version():
             return models[0]
 
 def select_file():
-    # If user cancel selection, enter the alter command interface
+    print("Please select your resume file: ", end='')
     root = tk.Tk()
     root.withdraw()
     file_path = filedialog.askopenfilename()
+    # If user cancel selection, enter the alter command interface
     if file_path == "":
+        print("Abort")
         return None
     else:
         return file_path
@@ -90,31 +93,48 @@ def run_gpt(assistant_id, thread_id):
 
     return all_messages
 
+def special_command(user_message, is_alter):
+    if user_message == '':
+        user_message = 'HELP'
+    if user_message == "HELP":
+        print('There are few commands for simple function:')
+        print('LIST: List all conversation stored in local, titled with the resume filename, with the saved timestamp.')
+        print('SELECT: Select a conversation stored in local, continue ask with GPT with context.')
+        print('NEW: Create a new conversation by uploading a resume.')
+        print('EXIT: Exit the program.')
+        if not is_alter:
+            print('ANY OTHER CONTENT: Ask for GPT about the resume.\n')
+        else:
+            print()
+    elif user_message == "LIST":
+        print_log()
+    elif user_message == 'SELECT':
+        continue_selected_log()
+    elif user_message == "NEW":
+        main()
+    elif user_message == "EXIT":
+        sys.exit()
+    else:
+        if is_alter:
+            pass
+        else:
+            return False
+    return True
+
 def keep_asking(assistant_id, thread_id):
     while True:
-        user_message = input("Specify your problem: ")
-        if user_message == 'NEW':
-            main()
-        elif user_message == 'EXIT':
-            break
-        ask_gpt(thread_id, user_message)
-        all_messages = run_gpt(assistant_id, thread_id)
-        # print(f"USER: {message.content[0].text.value}")
-        print(f"ASSISTANT: {all_messages.data[0].content[0].text.value} \n")
+        user_message = input("\nSpecify your problem: ")
+        if not special_command(user_message, is_alter=False):
+            ask_gpt(thread_id, user_message)
+            all_messages = run_gpt(assistant_id, thread_id)
+            # print(f"USER: {message.content[0].text.value}")
+            print(f"ASSISTANT: {all_messages.data[0].content[0].text.value}")
 
 def alter_interface():
     while True:
         command = input("Specify command: ")
-        if command == "HELP":
-            print('')
-        elif command == "LIST":
-            print_log()
-        elif command == 'SELECT':
-            continue_selected_log()
-        elif command == "NEW":
-            main()
-        elif command == "EXIT":
-            break
+        special_command(command, is_alter=True)
+
 
 def save_csv(file_path, assistant, thread):
     file_name = os.path.basename(file_path)
@@ -164,9 +184,9 @@ def continue_selected_log():
 def main():
     # TODO: If input --dryrun or -d, skip the resume selection stage
     # TODO: If input --file-path or -f, skip the resume selection stage
-    print("Please select your resume file: ", end='')
     file_path = select_file()
     if file_path is None:
+        print("Enter alter interface...\n")
         alter_interface()
     print(file_path+'\n')
     file_id = upload_file(file_path)
