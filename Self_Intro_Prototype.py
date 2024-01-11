@@ -2,8 +2,12 @@ from pathlib import Path
 from openai import OpenAI
 import tkinter as tk
 from tkinter import filedialog
+import os
+from dotenv import load_dotenv
 
-client = OpenAI(api_key='')
+load_dotenv()
+api_key = os.getenv('OPENAI_API_KEY')
+client = OpenAI(api_key=api_key)
 
 def get_model_version():
     print("Select the GPT model version: ")
@@ -35,9 +39,42 @@ def upload_file(file_path):
     )
     return response.id
 
+def ask(thread, user_message):
+    message = client.beta.threads.messages.create(
+        thread_id=thread.id,
+        role="user",
+        content=user_message
+    )
+    return 0
+
+def run_gpt(assistant, thread):
+    run = client.beta.threads.runs.create(
+        thread_id=thread.id,
+        assistant_id=assistant.id
+    )
+
+    printed = False
+    while run.status != "completed":
+        keep_retrieving_run = client.beta.threads.runs.retrieve(
+            thread_id=thread.id,
+            run_id=run.id
+        )
+        if not printed:
+            print(f"Run status: {keep_retrieving_run.status}")
+            printed = True
+
+        if keep_retrieving_run.status == "completed":
+            print("Completed")
+            break
+
+    all_messages = client.beta.threads.messages.list(
+        thread_id=thread.id
+    )
+
+    return all_messages
+
 
 def main():
-    # TODO: Pop out a select file GUI window, user-friendly
     print("Please select your resume file: ")
     file_path = select_file()
     file_id = upload_file(file_path)
@@ -55,35 +92,8 @@ def main():
 
     while True:
         user_message = input("Specify your problem: ")
-        message = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=user_message
-        )
-
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant.id
-        )
-
-        printed = False
-        while run.status != "completed":
-            keep_retrieving_run = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            if not printed:
-                print(f"Run status: {keep_retrieving_run.status}")
-                printed = True
-
-            if keep_retrieving_run.status == "completed":
-                print("Completed")
-                break
-
-        all_messages = client.beta.threads.messages.list(
-            thread_id=thread.id
-        )
-
+        ask(thread, user_message)
+        all_messages = run_gpt(assistant, thread)
         # print(f"USER: {message.content[0].text.value}")
         print(f"ASSISTANT: {all_messages.data[0].content[0].text.value}")
 
