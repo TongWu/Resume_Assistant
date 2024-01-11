@@ -136,10 +136,10 @@ def alter_interface():
         special_command(command, is_alter=True)
 
 
-def save_csv(file_path, assistant, thread):
+def save_csv(file_path, assistant_id, thread_id):
     file_name = os.path.basename(file_path)
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    data = [file_name, assistant.id, thread.id, current_time]
+    data = [file_name, assistant_id, thread_id, current_time]
     csv_file = 'log.csv'
     file_exists = os.path.isfile(csv_file)
     with open(csv_file, 'a', newline='', encoding='utf-8') as f:
@@ -194,7 +194,7 @@ def main():
     # TODO: If input with --dryrun or -d, do not create the assistant, give a command interface for more commands
     # TODO: In the dryrun command interface, 'LIST' to list all existing assistant, select assistant to create a thread
     assistant = client.beta.assistants.create(
-        instructions="Now you're an AI assistant helping the interviewer summarize and extend the key points in resume. You need to answer the questions asked by the user based on the resume file provided. Also, the user may ask some general questions, you need to answer these by default model.",
+        instructions="You are the AI assistant helping the interviewer look the key points in resume. You need to answer the questions asked by the user based on the resume file provided. Also, the user may ask some general questions, you need to answer these by default model.",
         model=get_model_version(),
         file_ids=[file_id],
         tools=[{"type": "retrieval"}]
@@ -202,7 +202,7 @@ def main():
 
     thread = client.beta.threads.create()
     # Save the current conservation window to local
-    save_csv(file_path, assistant, thread)
+    save_csv(file_path, assistant.id, thread.id)
 
     # When user upload a resume, generate a brief introduction of this resume
     first_summary(assistant.id, thread.id)
