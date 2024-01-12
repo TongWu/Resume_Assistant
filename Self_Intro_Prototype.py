@@ -15,9 +15,8 @@ load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
 model_env = os.getenv('GPT_MODEL')
 client = OpenAI(api_key=api_key)
-env_path = '.env'
-log_file_path = 'log.csv'
-instruction_path = 'instructions.json'
+log_file_path = './log.csv'
+instruction_path = './instructions.json'
 
 def load_instructions(file_path):
     """
@@ -26,24 +25,28 @@ def load_instructions(file_path):
     :param file_path: The path to the JSON file containing the instructions.
     :return: A dictionary containing the instructions.
     """
-    with open(file_path, 'r', encoding='utf-8') as file:
-        data = json.load(file)
-        return data
+    with open(file_path, 'r', encoding='utf-8') as jsonfile:
+        data = json.load(jsonfile)
+    jsonfile.close()
+    return data
 
-def get_model_version(model_cmd):
+def get_model_version(model_cmd, isprint):
     """
     Determine the model version to use based on command line input or .env settings.
 
+    :param isprint: Select to print the outcome or not.
     :param model_cmd: The model version specified via command line argument.
     :return: The selected model version.
     """
     # First check the cmd line input for model version
     if model_cmd:
-        print(f"Select the model {model_cmd} specified via command line. \n")
+        if isprint:
+            print(f"Select the model {model_cmd} specified via command line. \n")
         return model_cmd
     # Second check .env file
     elif model_env:
-        print(f"Select the model {model_env} specify in the .env file. \n")
+        if isprint:
+            print(f"Select the model {model_env} specify in the .env file. \n")
         return model_env
     # If both above not specified, select the model
     else:
@@ -112,7 +115,7 @@ def create_assistant(prompt=None, model='gpt-3.5-turbo-1106', file_ids=None, too
     # Create an assistant
     return client.beta.assistants.create(
         instructions=prompt,
-        model=get_model_version(model),
+        model=get_model_version(model, True),
         file_ids=file_ids,
         tools=[{"type": tool_type}]
     )
@@ -135,21 +138,26 @@ def spinning_cursor():
         for cursor in '|/-\\':
             yield cursor
 
-def first_summary(assistant_id, thread_id, prompt=None):
+def first_summary(assistant_id, thread_id, log_file):
     """
     Generate a brief summary based on a given prompt.
 
+    :param log_file: Store the conversation.
     :param assistant_id: The ID of the assistant.
     :param thread_id: The ID of the thread.
-    :param prompt: The prompt for generating the summary.
     :return: None.
     """
-    if not prompt:
-        instructions = load_instructions(instruction_path)
-        prompt = instructions['summary']
+    instructions = load_instructions(instruction_path)
+    prompt = instructions['summary']
+    if isinstance(prompt, str):
+        log_conversation(log_file, f"\033[34mSummary Prompt:\033[0m\n{prompt}\n")
 
-    ask_gpt(thread_id, prompt)
-    print(f'\033[32mSELF INTRODUCTION:\033[0m\n{run_gpt(assistant_id, thread_id).data[0].content[0].text.value}')
+        ask_gpt(thread_id, prompt)
+        response = run_gpt(assistant_id, thread_id).data[0].content[0].text.value
+        print(f'\033[32mSELF INTRODUCTION:\033[0m\n{response}')
+
+        log_conversation(log_file, f"\033[32mSELF INTRODUCTION:\033[0m\n{response}\n")
+        log_file.close()
 
 def ask_gpt(thread_id, user_message):
     """
@@ -221,12 +229,12 @@ def special_command(user_message, is_alter):
         user_message = 'HELP'
     if user_message == "HELP":
         print('There are few commands for simple function:')
-        print('LIST: List all conversation stored in local, titled with the resume filename, with the saved timestamp.')
-        print('SELECT: Select a conversation stored in local, continue ask with GPT with context.')
-        print('NEW: Create a new conversation by uploading a resume.')
-        print('EXIT: Exit the program.')
+        print('\033[32mLIST\033[0m: List all conversation stored in local, titled with the resume filename, with the saved timestamp.')
+        print('\033[32mSELECT\033[0m: Select a conversation stored in local, continue ask with GPT with context.')
+        print('\033[32mNEW\033[0m: Create a new conversation by uploading a resume.')
+        print('\033[32mEXIT\033[0m: Exit the program.')
         if not is_alter:
-            print('ANY OTHER CONTENT: Ask for GPT about the resume.\n')
+            print('\033[32mANY OTHER CONTENT\033[0m: Ask for GPT about the resume.')
         else:
             print()
     elif user_message == "LIST":
@@ -244,10 +252,11 @@ def special_command(user_message, is_alter):
             return False
     return True
 
-def keep_asking(assistant_id, thread_id):
+def keep_asking(assistant_id, thread_id, log_file):
     """
     Continuously ask questions to the GPT assistant.
 
+    :param log_file: Store the conversation.
     :param assistant_id: The ID of the assistant.
     :param thread_id: The ID of the thread.
     :return: None.
@@ -255,10 +264,14 @@ def keep_asking(assistant_id, thread_id):
     while True:
         user_message = input("\n\033[34mSpecify your problem:\033[0m ")
         if not special_command(user_message, is_alter=False):
+            log_conversation(log_file, f"\n\033[34mUser:\033[0m\n{user_message}\n")
             ask_gpt(thread_id, user_message)
             all_messages = run_gpt(assistant_id, thread_id)
             # print(f"\033[34m\nUSER: {message.content[0].text.value}\033[0m")
-            print(f"\033[32mINTERVIEWEE:\033[0m\n{all_messages.data[0].content[0].text.value}")
+            response = all_messages.data[0].content[0].text.value
+            print(f"\033[32mINTERVIEWEE:\033[0m\n{response}")
+            log_conversation(log_file, f"\033[32mInterviewee:\033[0m\n{response}\n")
+            log_file.close()
 
 def alter_interface():
     """
@@ -271,18 +284,20 @@ def alter_interface():
         special_command(command, is_alter=True)
 
 
-def save_csv(file_path, assistant_id, thread_id):
+def save_csv(file_path, assistant_id, thread_id, current_time, conversation_log_path):
     """
     Save conversation details to a CSV file.
 
+    :param conversation_log_path: File path of conversation log.
+    :param current_time: The timestamp of current time.
     :param file_path: The path of the file related to the conversation.
     :param assistant_id: The ID of the assistant.
     :param thread_id: The ID of the thread.
     :return: None
     """
     file_name = os.path.basename(file_path)
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    data = [file_name, assistant_id, thread_id, current_time]
+    model_name = get_model_version('', False)
+    data = [file_name, assistant_id, thread_id, current_time, conversation_log_path, model_name]
     file_exists = os.path.isfile(log_file_path)
     with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
@@ -318,7 +333,7 @@ def print_log():
     data = read_csv()
     # Print filename and timestamp
     for i, row in enumerate(data):
-        print(f"{i + 1}: {row[0]}, {row[3]}")
+        print(f"{i + 1}: {row[0]}, {row[5]}, {row[3]}")
     return data
 
 def select_exist_log():
@@ -332,6 +347,15 @@ def select_exist_log():
     if 1 <= selection <= len(data):
         return data[selection - 1]
 
+def display_conversation(path):
+    """
+    Display the content of a log file.
+
+    :param path: The path to the log file.
+    """
+    with open(path, 'r', encoding='utf-8') as file:
+        print(file.read())
+
 def continue_selected_log():
     """
     Continue interaction based on a selected log entry.
@@ -341,8 +365,32 @@ def continue_selected_log():
     data = select_exist_log()
     thread_id = data[2]
     assistant_id = data[1]
-    first_summary(assistant_id, thread_id)
-    keep_asking(assistant_id, thread_id)
+    # first_summary(assistant_id, thread_id)
+    conversation_path = data[4]
+    log_file = open(conversation_path, 'a', encoding='utf-8')
+    display_conversation(conversation_path)
+    keep_asking(assistant_id, thread_id, log_file)
+
+def create_conversation_log(timestamp):
+    """
+    Create a new log file with a timestamp name.
+
+    :return: The file object and file path of the new log file.
+    """
+    conversation_log_path = f"./logs/log_{timestamp}.txt"
+    if not os.path.exists("./logs"):
+        os.makedirs("./logs")
+    log_file = open(conversation_log_path, 'a', encoding='utf-8')
+    return log_file, conversation_log_path
+
+def log_conversation(log_file, message):
+    """
+    Log a message to the log file.
+
+    :param log_file: The log file object.
+    :param message: The message to log.
+    """
+    log_file.write(message + '\n')
 
 def main():
     parser = argparse.ArgumentParser()
@@ -367,13 +415,16 @@ def main():
         assistant = create_assistant(model=args.model, file_ids=[file_id], tool_type="retrieval")
         thread = create_thread()
         # Save the current conservation window to local
-        save_csv(file_path, assistant.id, thread.id)
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        log_file, conversation_path = create_conversation_log(current_time)
+        save_csv(file_path, assistant.id, thread.id, current_time, conversation_path)
 
         # When user upload a resume, generate a brief introduction of this resume
-        first_summary(assistant.id, thread.id)
+        first_summary(assistant.id, thread.id, log_file)
 
         # Let user keep ask AI
-        keep_asking(assistant.id, thread.id)
+        keep_asking(assistant.id, thread.id, log_file)
     else:
         print("Running in dry-run mode. Enter 'HELP' for special commands.")
         alter_interface()
