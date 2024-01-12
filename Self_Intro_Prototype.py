@@ -8,17 +8,29 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 import sys
+import argparse
+import json
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
-model_selection = os.getenv('GPT_MODEL')
+model_env = os.getenv('GPT_MODEL')
 client = OpenAI(api_key=api_key)
 
-def get_model_version():
-    # TODO: If input with option --model or -m, override model in .env file, and skip the model selection stage
-    if model_selection is not None:
-        print(f"Select the model {model_selection} specify in the .env file. \n")
-        return model_selection
+def load_instructions(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        data = json.load(file)
+        return data
+
+def get_model_version(model_cmd):
+    # First check the cmd line input for model version
+    if model_cmd:
+        print(f"Select the model {model_cmd} specified via command line. \n")
+        return model_cmd
+    # Second check .env file
+    elif model_env:
+        print(f"Select the model {model_env} specify in the .env file. \n")
+        return model_env
+    # If both above not specified, select the model
     else:
         print("Select the GPT model version: ")
         print("1. gpt-3.5-turbo-1106        (16,385 tokens)   (Default)")
@@ -29,6 +41,7 @@ def get_model_version():
             if 1 <= selection <= len(models):
                 print(f'Select model {models[selection-1]} \n')
                 return models[selection - 1]
+        # If wrong number or empty, select default
             else:
                 print("Invalid selection. Selecting default model (gpt-3.5-turbo-1106). \n")
                 return models[0]
@@ -38,6 +51,7 @@ def get_model_version():
 
 def select_file():
     print("Please select your resume file: ", end='')
+    # Pop up window
     root = tk.Tk()
     root.withdraw()
     file_path = filedialog.askopenfilename()
@@ -49,6 +63,7 @@ def select_file():
         return file_path
 
 def upload_file(file_path):
+    # OpenAI API
     response = client.files.create(
         file=Path(file_path),
         purpose="assistants"
@@ -61,7 +76,7 @@ def spinning_cursor():
             yield cursor
 
 def first_summary(assistant_id, thread_id):
-    ask_gpt(thread_id, "Give bullet-point of candidate's contact information, education experience, and skills as the following format: - Candidate Name: \n - Candidate Phone: \n - Candidate Email: \n - Education Experience \n - Skills \n")
+    ask_gpt(thread_id, "")
 
     print(f'\033[32mBRIEF SUMMARY:\033[0m\n{run_gpt(assistant_id, thread_id).data[0].content[0].text.value}')
 
@@ -193,32 +208,46 @@ def continue_selected_log():
     keep_asking(assistant_id, thread_id)
 
 def main():
-    # TODO: If input --dryrun or -d, skip the resume selection stage
-    # TODO: If input --file-path or -f, skip the resume selection stage
-    file_path = select_file()
-    if file_path is None:
-        print("Enter alter interface...\n")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--dryrun', action='store_true', help='Run in dry-run mode')
+    parser.add_argument('-f', '--file-path', type=str, help='Specify the file path of the resume')
+    parser.add_argument('-m', '--model', type=str, help='Specify the model version')
+    args = parser.parse_args()
+
+    # instruction_data = load_instructions('instructions.json')
+
+
+    file_path = None
+    if args.file_path:
+        file_path = args.file_path
+    elif not args.dryrun:
+        file_path = select_file()
+        if file_path is None:
+            print("Enter alter interface...\n")
+            alter_interface()
+    print(file_path+'\n') if file_path else print("No file selected.\n")
+
+    # If input with --dryrun or -d, do not create the assistant, give a command interface for more commands
+    if not args.dryrun:
+        file_id = upload_file(file_path)
+        assistant = client.beta.assistants.create(
+            instructions="",
+            model=get_model_version(args.model),
+            file_ids=[file_id],
+            tools=[{"type": "retrieval"}]
+        )
+        thread = client.beta.threads.create()
+        # Save the current conservation window to local
+        save_csv(file_path, assistant.id, thread.id)
+
+        # When user upload a resume, generate a brief introduction of this resume
+        first_summary(assistant.id, thread.id)
+
+        # Let user keep ask AI
+        keep_asking(assistant.id, thread.id)
+    else:
+        print("Running in dry-run mode. Enter 'HELP' for special commands.")
         alter_interface()
-    print(file_path+'\n')
-    file_id = upload_file(file_path)
-
-    # TODO: If input with --dryrun or -d, do not create the assistant, give a command interface for more commands
-    # TODO: In the dryrun command interface, 'LIST' to list all existing assistant, select assistant to create a thread
-    assistant = client.beta.assistants.create(
-        instructions="You are the AI assistant helping the interviewer look the key points in resume. You need to answer the questions asked by the user based on the resume file provided. Each of your answer need to be summarized. Also, the user may ask some general questions, you need to answer these by default model.",
-        model=get_model_version(),
-        file_ids=[file_id],
-        tools=[{"type": "retrieval"}]
-    )
-
-    thread = client.beta.threads.create()
-    # Save the current conservation window to local
-    save_csv(file_path, assistant.id, thread.id)
-
-    # When user upload a resume, generate a brief introduction of this resume
-    first_summary(assistant.id, thread.id)
-
-    keep_asking(assistant.id, thread.id)
 
 
 if __name__ == "__main__":
