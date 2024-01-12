@@ -149,7 +149,7 @@ def first_summary(assistant_id, thread_id, prompt=None):
         prompt = instructions['summary']
 
     ask_gpt(thread_id, prompt)
-    print(f'\033[32mBRIEF SUMMARY:\033[0m\n{run_gpt(assistant_id, thread_id).data[0].content[0].text.value}')
+    print(f'\033[32mSELF INTRODUCTION:\033[0m\n{run_gpt(assistant_id, thread_id).data[0].content[0].text.value}')
 
 def ask_gpt(thread_id, user_message):
     """
@@ -258,7 +258,7 @@ def keep_asking(assistant_id, thread_id):
             ask_gpt(thread_id, user_message)
             all_messages = run_gpt(assistant_id, thread_id)
             # print(f"\033[34m\nUSER: {message.content[0].text.value}\033[0m")
-            print(f"\033[32mASSISTANT:\033[0m\n{all_messages.data[0].content[0].text.value}")
+            print(f"\033[32mINTERVIEWEE:\033[0m\n{all_messages.data[0].content[0].text.value}")
 
 def alter_interface():
     """
