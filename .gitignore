@@ -11,3 +11,5 @@ out
 gen
 
 log.csv
+
+logs/
