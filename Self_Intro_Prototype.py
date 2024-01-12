@@ -1,4 +1,5 @@
 import csv
+import time
 from pathlib import Path
 from openai import OpenAI
 import tkinter as tk
@@ -54,10 +55,15 @@ def upload_file(file_path):
     )
     return response.id
 
-def first_summary(assistant_id, thread_id):
-    ask_gpt(thread_id, "Give a brief bullet-point of candidate's name, education experience, and skills as the following format: - Candidate Name: \n - Candidate Phone: \n - Candidate Email: \n - Education Experience \n - Skills \n")
+def spinning_cursor():
+    while True:
+        for cursor in '|/-\\':
+            yield cursor
 
-    print(f'BRIEF SUMMARY:\n {run_gpt(assistant_id, thread_id).data[0].content[0].text.value}')
+def first_summary(assistant_id, thread_id):
+    ask_gpt(thread_id, "Give bullet-point of candidate's contact information, education experience, and skills as the following format: - Candidate Name: \n - Candidate Phone: \n - Candidate Email: \n - Education Experience \n - Skills \n")
+
+    print(f'\033[32mBRIEF SUMMARY:\033[0m\n{run_gpt(assistant_id, thread_id).data[0].content[0].text.value}')
 
 def ask_gpt(thread_id, user_message):
     message = client.beta.threads.messages.create(
@@ -74,6 +80,7 @@ def run_gpt(assistant_id, thread_id):
     )
 
     printed = False
+    spinner = spinning_cursor()
     while run.status != "completed":
         keep_retrieving_run = client.beta.threads.runs.retrieve(
             thread_id=thread_id,
@@ -83,8 +90,12 @@ def run_gpt(assistant_id, thread_id):
             print("Progressing... ", end='')
             printed = True
 
+        sys.stdout.write(next(spinner) + '\b')
+        sys.stdout.flush()
+        time.sleep(0.1)
+
         if keep_retrieving_run.status == "completed":
-            print("Completed \n")
+            print("\033[32mCompleted\033[0m \n")
             break
 
     all_messages = client.beta.threads.messages.list(
@@ -123,12 +134,12 @@ def special_command(user_message, is_alter):
 
 def keep_asking(assistant_id, thread_id):
     while True:
-        user_message = input("\nSpecify your problem: ")
+        user_message = input("\n\033[34mSpecify your problem:\033[0m ")
         if not special_command(user_message, is_alter=False):
             ask_gpt(thread_id, user_message)
             all_messages = run_gpt(assistant_id, thread_id)
             # print(f"USER: {message.content[0].text.value}")
-            print(f"ASSISTANT: {all_messages.data[0].content[0].text.value}")
+            print(f"\033[32mASSISTANT:\033[0m\n{all_messages.data[0].content[0].text.value}")
 
 def alter_interface():
     while True:
@@ -194,7 +205,7 @@ def main():
     # TODO: If input with --dryrun or -d, do not create the assistant, give a command interface for more commands
     # TODO: In the dryrun command interface, 'LIST' to list all existing assistant, select assistant to create a thread
     assistant = client.beta.assistants.create(
-        instructions="You are the AI assistant helping the interviewer look the key points in resume. You need to answer the questions asked by the user based on the resume file provided. Also, the user may ask some general questions, you need to answer these by default model.",
+        instructions="You are the AI assistant helping the interviewer look the key points in resume. You need to answer the questions asked by the user based on the resume file provided. Each of your answer need to be summarized. Also, the user may ask some general questions, you need to answer these by default model.",
         model=get_model_version(),
         file_ids=[file_id],
         tools=[{"type": "retrieval"}]
