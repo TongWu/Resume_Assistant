@@ -15,6 +15,9 @@ load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
 model_env = os.getenv('GPT_MODEL')
 client = OpenAI(api_key=api_key)
+env_path = '.env'
+log_file_path = 'log.csv'
+instruction_path = 'instructions.json'
 
 def load_instructions(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -70,18 +73,35 @@ def upload_file(file_path):
     )
     return response.id
 
+def create_assistant(prompt=None, model='gpt-3.5-turbo-1106', file_ids=None, tool_type="retrieval"):
+    if not prompt:
+        instructions = load_instructions(instruction_path)
+        prompt = instructions['assistant']
+    return client.beta.assistants.create(
+        instructions=prompt,
+        model=get_model_version(model),
+        file_ids=file_ids,
+        tools=[{"type": tool_type}]
+    )
+
+def create_thread():
+    return client.beta.threads.create()
+
 def spinning_cursor():
     while True:
         for cursor in '|/-\\':
             yield cursor
 
-def first_summary(assistant_id, thread_id):
-    ask_gpt(thread_id, "")
+def first_summary(assistant_id, thread_id, prompt=None):
+    if not prompt:
+        instructions = load_instructions(instruction_path)
+        prompt = instructions['summary']
+    ask_gpt(thread_id, prompt)
 
     print(f'\033[32mBRIEF SUMMARY:\033[0m\n{run_gpt(assistant_id, thread_id).data[0].content[0].text.value}')
 
 def ask_gpt(thread_id, user_message):
-    message = client.beta.threads.messages.create(
+    client.beta.threads.messages.create(
         thread_id=thread_id,
         role="user",
         content=user_message
@@ -166,20 +186,18 @@ def save_csv(file_path, assistant_id, thread_id):
     file_name = os.path.basename(file_path)
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     data = [file_name, assistant_id, thread_id, current_time]
-    csv_file = 'log.csv'
-    file_exists = os.path.isfile(csv_file)
-    with open(csv_file, 'a', newline='', encoding='utf-8') as f:
+    file_exists = os.path.isfile(log_file_path)
+    with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         if not file_exists:
             writer.writerow(['File Name', 'Assistant ID', 'Thread ID', 'Timestamp'])
         writer.writerow(data)
 
 def read_csv():
-    file_path = 'log.csv'
-    if not os.path.exists(file_path):
+    if not os.path.exists(log_file_path):
         print("The log file does not exist.")
         return []
-    with open(file_path, 'r', encoding='utf-8') as file:
+    with open(log_file_path, 'r', encoding='utf-8') as file:
         reader = csv.reader(file)
         rows = list(reader)
         if len(rows) <= 1:
@@ -214,9 +232,6 @@ def main():
     parser.add_argument('-m', '--model', type=str, help='Specify the model version')
     args = parser.parse_args()
 
-    # instruction_data = load_instructions('instructions.json')
-
-
     file_path = None
     if args.file_path:
         file_path = args.file_path
@@ -230,13 +245,8 @@ def main():
     # If input with --dryrun or -d, do not create the assistant, give a command interface for more commands
     if not args.dryrun:
         file_id = upload_file(file_path)
-        assistant = client.beta.assistants.create(
-            instructions="",
-            model=get_model_version(args.model),
-            file_ids=[file_id],
-            tools=[{"type": "retrieval"}]
-        )
-        thread = client.beta.threads.create()
+        assistant = create_assistant(model=args.model, file_ids=[file_id], tool_type="retrieval")
+        thread = create_thread()
         # Save the current conservation window to local
         save_csv(file_path, assistant.id, thread.id)
 
