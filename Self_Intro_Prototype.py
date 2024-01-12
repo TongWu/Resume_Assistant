@@ -20,11 +20,23 @@ log_file_path = 'log.csv'
 instruction_path = 'instructions.json'
 
 def load_instructions(file_path):
+    """
+    Load instructions from a JSON file.
+
+    :param file_path: The path to the JSON file containing the instructions.
+    :return: A dictionary containing the instructions.
+    """
     with open(file_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
         return data
 
 def get_model_version(model_cmd):
+    """
+    Determine the model version to use based on command line input or .env settings.
+
+    :param model_cmd: The model version specified via command line argument.
+    :return: The selected model version.
+    """
     # First check the cmd line input for model version
     if model_cmd:
         print(f"Select the model {model_cmd} specified via command line. \n")
@@ -53,6 +65,11 @@ def get_model_version(model_cmd):
             return models[0]
 
 def select_file():
+    """
+    Open a file dialog for the user to select a file.
+
+    :return: The path to the selected file, or None if no file is selected.
+    """
     print("Please select your resume file: ", end='')
     # Pop up window
     root = tk.Tk()
@@ -66,6 +83,12 @@ def select_file():
         return file_path
 
 def upload_file(file_path):
+    """
+    Upload a file to OpenAI.
+
+    :param file_path: The path to the file to be uploaded.
+    :return: The ID of the uploaded file.
+    """
     # OpenAI API
     response = client.files.create(
         file=Path(file_path),
@@ -74,9 +97,19 @@ def upload_file(file_path):
     return response.id
 
 def create_assistant(prompt=None, model='gpt-3.5-turbo-1106', file_ids=None, tool_type="retrieval"):
+    """
+    Create an assistant using the OpenAI API.
+
+    :param prompt: The instruction prompt for the assistant.
+    :param model: The model version to use.
+    :param file_ids: List of file IDs to be used by the assistant.
+    :param tool_type: The type of tool to be used.
+    :return: The created assistant object.
+    """
     if not prompt:
         instructions = load_instructions(instruction_path)
         prompt = instructions['assistant']
+    # Create an assistant
     return client.beta.assistants.create(
         instructions=prompt,
         model=get_model_version(model),
@@ -85,22 +118,48 @@ def create_assistant(prompt=None, model='gpt-3.5-turbo-1106', file_ids=None, too
     )
 
 def create_thread():
+    """
+    Create a new thread for interaction with an assistant.
+
+    :return: The created thread object.
+    """
     return client.beta.threads.create()
 
 def spinning_cursor():
+    """
+    Generator for a spinning cursor animation.
+
+    :return: Yields the next character in the spinning cursor sequence.
+    """
     while True:
         for cursor in '|/-\\':
             yield cursor
 
 def first_summary(assistant_id, thread_id, prompt=None):
+    """
+    Generate a brief summary based on a given prompt.
+
+    :param assistant_id: The ID of the assistant.
+    :param thread_id: The ID of the thread.
+    :param prompt: The prompt for generating the summary.
+    :return: None.
+    """
     if not prompt:
         instructions = load_instructions(instruction_path)
         prompt = instructions['summary']
-    ask_gpt(thread_id, prompt)
 
+    ask_gpt(thread_id, prompt)
     print(f'\033[32mBRIEF SUMMARY:\033[0m\n{run_gpt(assistant_id, thread_id).data[0].content[0].text.value}')
 
 def ask_gpt(thread_id, user_message):
+    """
+    Send a message to the GPT assistant.
+
+    :param thread_id: The ID of the thread.
+    :param user_message: The message to send.
+    :return: 0 indicating success.
+    """
+    # Push message to assistant
     client.beta.threads.messages.create(
         thread_id=thread_id,
         role="user",
@@ -109,6 +168,14 @@ def ask_gpt(thread_id, user_message):
     return 0
 
 def run_gpt(assistant_id, thread_id):
+    """
+    Execute a run of the GPT assistant.
+
+    :param assistant_id: The ID of the assistant.
+    :param thread_id: The ID of the thread.
+    :return: All messages from the run.
+    """
+    # Run the thread
     run = client.beta.threads.runs.create(
         thread_id=thread_id,
         assistant_id=assistant_id
@@ -116,6 +183,7 @@ def run_gpt(assistant_id, thread_id):
 
     printed = False
     spinner = spinning_cursor()
+    # Retrieve the status
     while run.status != "completed":
         keep_retrieving_run = client.beta.threads.runs.retrieve(
             thread_id=thread_id,
@@ -133,6 +201,7 @@ def run_gpt(assistant_id, thread_id):
             print("\033[32mCompleted\033[0m \n")
             break
 
+    # Return the answer message
     all_messages = client.beta.threads.messages.list(
         thread_id=thread_id
     )
@@ -140,6 +209,14 @@ def run_gpt(assistant_id, thread_id):
     return all_messages
 
 def special_command(user_message, is_alter):
+    """
+    Process special commands entered by the user.
+
+    :param user_message: The message or command entered by the user.
+    :param is_alter: Boolean indicating if in alter mode.
+    :return: True if a special command was processed, False otherwise.
+    """
+    # If user press ENTER, return 'HELP' command
     if user_message == '':
         user_message = 'HELP'
     if user_message == "HELP":
@@ -168,21 +245,41 @@ def special_command(user_message, is_alter):
     return True
 
 def keep_asking(assistant_id, thread_id):
+    """
+    Continuously ask questions to the GPT assistant.
+
+    :param assistant_id: The ID of the assistant.
+    :param thread_id: The ID of the thread.
+    :return: None.
+    """
     while True:
         user_message = input("\n\033[34mSpecify your problem:\033[0m ")
         if not special_command(user_message, is_alter=False):
             ask_gpt(thread_id, user_message)
             all_messages = run_gpt(assistant_id, thread_id)
-            # print(f"USER: {message.content[0].text.value}")
+            # print(f"\033[34m\nUSER: {message.content[0].text.value}\033[0m")
             print(f"\033[32mASSISTANT:\033[0m\n{all_messages.data[0].content[0].text.value}")
 
 def alter_interface():
+    """
+    Provide an alternative command interface.
+
+    :return: None.
+    """
     while True:
         command = input("Specify command: ")
         special_command(command, is_alter=True)
 
 
 def save_csv(file_path, assistant_id, thread_id):
+    """
+    Save conversation details to a CSV file.
+
+    :param file_path: The path of the file related to the conversation.
+    :param assistant_id: The ID of the assistant.
+    :param thread_id: The ID of the thread.
+    :return: None
+    """
     file_name = os.path.basename(file_path)
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     data = [file_name, assistant_id, thread_id, current_time]
@@ -194,6 +291,11 @@ def save_csv(file_path, assistant_id, thread_id):
         writer.writerow(data)
 
 def read_csv():
+    """
+    Read and return the contents of the log CSV file.
+
+    :return: A list of rows from the CSV file.
+    """
     if not os.path.exists(log_file_path):
         print("The log file does not exist.")
         return []
@@ -203,22 +305,39 @@ def read_csv():
         if len(rows) <= 1:
             print('The log file has only the title row.')
             return []
+    # Read csv without title
     data = rows[1:]
     return data
 
 def print_log():
+    """
+    Print the log entries from the CSV file.
+
+    :return: The data read from the CSV file.
+    """
     data = read_csv()
+    # Print filename and timestamp
     for i, row in enumerate(data):
         print(f"{i + 1}: {row[0]}, {row[3]}")
     return data
 
 def select_exist_log():
+    """
+    Allow the user to select an existing log entry.
+
+    :return: The data of the selected log entry.
+    """
     data = print_log()
     selection = int(input("Select resume file: "))
     if 1 <= selection <= len(data):
         return data[selection - 1]
 
 def continue_selected_log():
+    """
+    Continue interaction based on a selected log entry.
+
+    :return: None.
+    """
     data = select_exist_log()
     thread_id = data[2]
     assistant_id = data[1]
