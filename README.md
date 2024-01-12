@@ -7,7 +7,8 @@
 1.   Download this repo’s zip file to local, unzip.
 2.   Fill your openai api key `OPENAI_API_KEY=''` and gpt model `GPT_MODEL=''` in .env file.
 3.   Open the repo’s folder in terminal，type `pip install -r requirements.txt` to install packages.
-4.   Tyoe `python ./Self_Intro_Prototype.py` to run the program
+4.   Type `python ./Self_Intro_Prototype.py` to run the program
+5.   For specific demands, check the file instructions.json for the prompt.
 
 ![image-20240112140708703](https://images.wu.engineer/images/2024/01/12/202401121407725.png)
 
