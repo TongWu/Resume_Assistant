@@ -1,6 +1,7 @@
 import csv
 import time
 from pathlib import Path
+import openai
 from openai import OpenAI
 import tkinter as tk
 from tkinter import filedialog
@@ -13,10 +14,22 @@ import json
 
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
-model_env = os.getenv('GPT_MODEL')
 client = OpenAI(api_key=api_key)
+model_env = os.getenv('GPT_MODEL')
 log_file_path = './log.csv'
 instruction_path = './instructions.json'
+
+
+def check_openai_api_key():
+    openai.api_key = api_key
+    try:
+        openai.models.list()
+    except openai.AuthenticationError as e:
+        print(e)
+        return False
+    else:
+        return True
+
 
 def load_instructions(file_path):
     """
@@ -29,6 +42,7 @@ def load_instructions(file_path):
         data = json.load(jsonfile)
     jsonfile.close()
     return data
+
 
 def get_model_version(model_cmd, isprint):
     """
@@ -57,15 +71,16 @@ def get_model_version(model_cmd, isprint):
         try:
             selection = int(input("Specify the model number: "))
             if 1 <= selection <= len(models):
-                print(f'Select model {models[selection-1]} \n')
+                print(f'Select model {models[selection - 1]} \n')
                 return models[selection - 1]
-        # If wrong number or empty, select default
+            # If wrong number or empty, select default
             else:
                 print("Invalid selection. Selecting default model (gpt-3.5-turbo-1106). \n")
                 return models[0]
         except ValueError:
             print("Invalid input. Selecting default model (gpt-3.5-turbo-1106). \n")
             return models[0]
+
 
 def select_file():
     """
@@ -85,6 +100,7 @@ def select_file():
     else:
         return file_path
 
+
 def upload_file(file_path):
     """
     Upload a file to OpenAI.
@@ -98,6 +114,7 @@ def upload_file(file_path):
         purpose="assistants"
     )
     return response.id
+
 
 def create_assistant(prompt=None, model='gpt-3.5-turbo-1106', file_ids=None, tool_type="retrieval"):
     """
@@ -120,6 +137,7 @@ def create_assistant(prompt=None, model='gpt-3.5-turbo-1106', file_ids=None, too
         tools=[{"type": tool_type}]
     )
 
+
 def create_thread():
     """
     Create a new thread for interaction with an assistant.
@@ -127,6 +145,7 @@ def create_thread():
     :return: The created thread object.
     """
     return client.beta.threads.create()
+
 
 def spinning_cursor():
     """
@@ -137,6 +156,7 @@ def spinning_cursor():
     while True:
         for cursor in '|/-\\':
             yield cursor
+
 
 def first_summary(assistant_id, thread_id, log_file):
     """
@@ -159,6 +179,7 @@ def first_summary(assistant_id, thread_id, log_file):
         log_conversation(log_file, f"\033[32mSELF INTRODUCTION:\033[0m\n{response}\n")
         log_file.close()
 
+
 def ask_gpt(thread_id, user_message):
     """
     Send a message to the GPT assistant.
@@ -174,6 +195,7 @@ def ask_gpt(thread_id, user_message):
         content=user_message
     )
     return 0
+
 
 def run_gpt(assistant_id, thread_id):
     """
@@ -216,6 +238,7 @@ def run_gpt(assistant_id, thread_id):
 
     return all_messages
 
+
 def special_command(user_message, is_alter):
     """
     Process special commands entered by the user.
@@ -229,7 +252,8 @@ def special_command(user_message, is_alter):
         user_message = 'HELP'
     if user_message == "HELP":
         print('There are few commands for simple function:')
-        print('\033[32mLIST\033[0m: List all conversation stored in local, titled with the resume filename, with the saved timestamp.')
+        print(
+            '\033[32mLIST\033[0m: List all conversation stored in local, titled with the resume filename, with the saved timestamp.')
         print('\033[32mSELECT\033[0m: Select a conversation stored in local, continue ask with GPT with context.')
         print('\033[32mNEW\033[0m: Create a new conversation by uploading a resume.')
         print('\033[32mEXIT\033[0m: Exit the program.')
@@ -252,6 +276,7 @@ def special_command(user_message, is_alter):
             return False
     return True
 
+
 def keep_asking(assistant_id, thread_id, log_file):
     """
     Continuously ask questions to the GPT assistant.
@@ -272,6 +297,7 @@ def keep_asking(assistant_id, thread_id, log_file):
             print(f"\033[32mINTERVIEWEE:\033[0m\n{response}")
             log_conversation(log_file, f"\033[32mInterviewee:\033[0m\n{response}\n")
             log_file.close()
+
 
 def alter_interface():
     """
@@ -305,6 +331,7 @@ def save_csv(file_path, assistant_id, thread_id, current_time, conversation_log_
             writer.writerow(['File Name', 'Assistant ID', 'Thread ID', 'Timestamp'])
         writer.writerow(data)
 
+
 def read_csv():
     """
     Read and return the contents of the log CSV file.
@@ -324,6 +351,7 @@ def read_csv():
     data = rows[1:]
     return data
 
+
 def print_log():
     """
     Print the log entries from the CSV file.
@@ -336,6 +364,7 @@ def print_log():
         print(f"{i + 1}: {row[0]}, {row[5]}, {row[3]}")
     return data
 
+
 def select_exist_log():
     """
     Allow the user to select an existing log entry.
@@ -347,6 +376,7 @@ def select_exist_log():
     if 1 <= selection <= len(data):
         return data[selection - 1]
 
+
 def display_conversation(path):
     """
     Display the content of a log file.
@@ -355,6 +385,7 @@ def display_conversation(path):
     """
     with open(path, 'r', encoding='utf-8') as file:
         print(file.read())
+
 
 def continue_selected_log():
     """
@@ -371,6 +402,7 @@ def continue_selected_log():
     display_conversation(conversation_path)
     keep_asking(assistant_id, thread_id, log_file)
 
+
 def create_conversation_log(timestamp):
     """
     Create a new log file with a timestamp name.
@@ -383,6 +415,7 @@ def create_conversation_log(timestamp):
     log_file = open(conversation_log_path, 'a', encoding='utf-8')
     return log_file, conversation_log_path
 
+
 def log_conversation(log_file, message):
     """
     Log a message to the log file.
@@ -392,7 +425,23 @@ def log_conversation(log_file, message):
     """
     log_file.write(message + '\n')
 
+
 def main():
+    global api_key
+    global client
+    if not api_key:
+        api_key = input("Please enter your OpenAI API key: ")
+        if not api_key:
+            print("No API key provided, exit...")
+            return
+    client = OpenAI(api_key=api_key)
+    while not check_openai_api_key():
+        api_key = input("API key error, type a new key here: ")
+        if not api_key:
+            print("No API key provided, exit...")
+            return
+        client = OpenAI(api_key=api_key)
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--dryrun', action='store_true', help='Run in dry-run mode')
     parser.add_argument('-f', '--file-path', type=str, help='Specify the file path of the resume')
@@ -407,7 +456,7 @@ def main():
         if file_path is None:
             print("Enter alter interface...\n")
             alter_interface()
-    print(file_path+'\n') if file_path else print("No file selected.\n")
+    print(file_path + '\n') if file_path else print("No file selected.\n")
 
     # If input with --dryrun or -d, do not create the assistant, give a command interface for more commands
     if not args.dryrun:
