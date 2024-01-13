@@ -1,6 +1,6 @@
 # SAP_TechAssessment
 
-[Program Introduction](./documents/AssessmentIntroduction.md)
+[Application Description](./documents/AssessmentIntroduction.md)
 
 ## Usage
 
