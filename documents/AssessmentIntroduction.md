@@ -40,13 +40,20 @@ The program executes core functionalities such as file uploading, assistant crea
 
 ### Answering User Questions
 
--   This step is similar to the previous one.
+-   After self-introduction, the application lets the user keep asking question.
+-   The application will do specific instructions when the user type special command, like “EXIT”, “SELECT”, etc.
 
 ### Additional Parameter Options
 
-Users can input special commands in the input line to make the program perform special tasks, such as reading sessions stored locally, starting a new session, etc.
+The program integrates a series of commands (such as SELECT, LIST, etc.), enhancing the interactivity and functionality of the user interface. These commands allow users to more conveniently browse and manage locally stored conversations. For instance, viewing a list of all conversations (using the LIST command) or selecting a specific conversation to continue the dialogue (using the SELECT command).
 
-![image-20240112142429752](https://images.wu.engineer/images/2024/01/12/202401121424773.png)
+![image-20240113132232923](https://images.wu.engineer/images/2024/01/13/202401131322960.png)
+
+### Store conversation and context
+
+The program is capable of locally storing the ID and context of each conversation. Through the LIST command, users can view all saved conversations, and with the SELECT command, they can choose a particular conversation to display its chat history. This feature provides users with a convenient way to review and continue previous conversations, enhancing the practicality and user experience of the AI assistant.
+
+![image-20240113143433983](https://images.wu.engineer/images/2024/01/13/202401131434012.png)
 
 ## Conclusion
 
