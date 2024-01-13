@@ -384,9 +384,10 @@ def display_conversation(path):
 
     :param path: The path to the log file.
     """
-    print()
+    print("\n\033[31m=====Chat Log Begin=====\033[0m\n")
     with open(path, 'r', encoding='utf-8') as file:
         print(file.read())
+    print("\n\033[31m=====Chat Log End=====\033[0m\n")
 
 
 def continue_selected_log():
