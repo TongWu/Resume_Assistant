@@ -1,4 +1,4 @@
-# SAP_TechAssessment
+# Resume Assistant
 
 [Application Description](./documents/AssessmentIntroduction.md)
 
