@@ -2,6 +2,7 @@ from sys import exit
 from Self_Intro_Prototype import main
 from helper.log_utility import print_log, continue_selected_log
 
+
 def special_command(user_message, is_alter):
     """
     Process special commands entered by the user.

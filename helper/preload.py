@@ -3,6 +3,7 @@ from tkinter import filedialog
 from helper.config import model_env
 import tkinter as tk
 
+
 def load_instructions(file_path):
     """
     Load instructions from a JSON file.
