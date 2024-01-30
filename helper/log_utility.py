@@ -3,6 +3,7 @@ from helper.csv_utility import read_csv
 from os import path, makedirs
 from helper.core import keep_asking
 
+
 def print_log():
     """
     Print the log entries from the CSV file.
@@ -33,14 +34,14 @@ def select_exist_log():
         Self_Intro_Prototype.main()
 
 
-def display_conversation(path):
+def display_conversation(log_path):
     """
     Display the content of a log file.
 
-    :param path: The path to the log file.
+    :param log_path: The path to the log file.
     """
     print("\n\033[31m=====Chat Log Begin=====\033[0m\n")
-    with open(path, 'r', encoding='utf-8') as file:
+    with open(log_path, 'r', encoding='utf-8') as file:
         print(file.read())
     print("\n\033[31m=====Chat Log End=====\033[0m\n")
 
