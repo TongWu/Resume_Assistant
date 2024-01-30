@@ -1,7 +1,7 @@
 from helper.openai_utility import ask_gpt, run_gpt
-from helper.preload import load_instructions
 from helper.config import instruction_path
-import helper
+import helper.preload as preload
+import helper.alter_interface as alter
 
 
 def first_summary(assistant_id, thread_id, talk_file_path):
@@ -13,7 +13,7 @@ def first_summary(assistant_id, thread_id, talk_file_path):
     :param thread_id: The ID of the thread.
     :return: None.
     """
-    instructions = load_instructions(instruction_path)
+    instructions = preload.load_instructions(instruction_path)
     prompt = instructions['summary']
     if isinstance(prompt, str):
         with open(talk_file_path, 'a', encoding='utf-8') as log_file:
@@ -37,7 +37,7 @@ def keep_asking(assistant_id, thread_id, talk_file_path):
     """
     while True:
         user_message = input("\n\033[34mSpecify your problem:\033[0m ")
-        if not helper.alter_interface.special_command(user_message, is_alter=False):
+        if not alter.special_command(user_message, is_alter=False):
             with open(talk_file_path, 'a', encoding='utf-8') as log_file:
                 ask_gpt(thread_id, user_message)
                 all_messages = run_gpt(assistant_id, thread_id)
